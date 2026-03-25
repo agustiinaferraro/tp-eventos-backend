@@ -75,8 +75,16 @@ io.on("connection", (socket) => {
     // Extraemos la energía enviada
     const energy = data.energy || 0;
 
+    // 🚫 si ya llegó a 1000, no suma más
+    if (globalPoints >= 1000) return;
+
     // Sumamos al total global
     globalPoints += energy;
+
+    // 🟡 evitamos que pase de 1000
+    if (globalPoints > 1000) {
+      globalPoints = 1000;
+    }
 
     // Actualizamos el estado (color)
     updateState();
