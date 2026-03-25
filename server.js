@@ -100,6 +100,20 @@ io.on("connection", (socket) => {
     });
   });
 
+  // 🔄 RESET DEL SISTEMA
+  socket.on("reset", () => {
+
+    globalPoints = 0;
+    currentColor = "orange";
+
+    io.emit("stateUpdate", {
+      points: globalPoints,
+      color: currentColor
+    });
+
+    console.log("🔄 Reset ejecutado");
+  });
+
   // DESCONEXIÓN
   socket.on("disconnect", () => {
     console.log("Usuario desconectado:", socket.id);
