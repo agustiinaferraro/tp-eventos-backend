@@ -1,0 +1,9 @@
+{
+  "build": {
+    "builder": "NIXPACKS",
+    "nixpacks": {
+      "installCommand": "npm install --no-package-lock",
+      "startCommand": "npm start"
+    }
+  }
+}
