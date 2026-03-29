@@ -29,6 +29,8 @@ const GESTURE_DURATION = 3000;
 const REPETITIONS_NEEDED = 5;
 const ACTIVITY_THRESHOLD = 3;
 
+const ROOM_TIMEOUT = 30 * 60 * 1000;
+
 function getRoomState(roomName) {
   if (!rooms[roomName]) {
     rooms[roomName] = {
@@ -45,9 +47,24 @@ function getRoomState(roomName) {
       freeMovementPhase: true,
       usersMoving: new Set(),
       moveRepetitions: new Map(),
-      nearThreshold: false
+      nearThreshold: false,
+      lastActivity: Date.now()
     };
   }
+  
+  if (rooms[roomName].activeUsers.size === 0 && Date.now() - rooms[roomName].lastActivity > ROOM_TIMEOUT) {
+    rooms[roomName].points = 0;
+    rooms[roomName].color = "orange";
+    rooms[roomName].lastThresholdIndex = 0;
+    rooms[roomName].nearThreshold = false;
+    rooms[roomName].freeMovementPhase = true;
+    rooms[roomName].usersDoingGesture.clear();
+    rooms[roomName].gestureRepetitions.clear();
+    rooms[roomName].usersMoving.clear();
+    rooms[roomName].moveRepetitions.clear();
+    console.log(`Sala ${roomName} - Reset por inactividad`);
+  }
+  
   return rooms[roomName];
 }
 
@@ -302,8 +319,11 @@ io.on("connection", (socket) => {
   socket.on("energy", (data) => {
     const room = getRoomState(roomName);
     const energy = data.energy || 0;
+    
+    room.lastActivity = Date.now();
 
     if (room.points >= 1000) return;
+    if (energy > 10) return;
 
     const oldPoints = room.points;
     room.points += energy;
@@ -313,7 +333,7 @@ io.on("connection", (socket) => {
 
     const updatedRoom = updateRoomState(roomName);
 
-    console.log(`Sala ${roomName} - Puntos: ${updatedRoom.points}`);
+    console.log(`Sala ${roomName} - Puntos: ${updatedRoom.points} (+${energy})`);
 
     io.to(roomName).emit("stateUpdate", {
       points: updatedRoom.points,
@@ -332,6 +352,7 @@ io.on("connection", (socket) => {
   
   socket.on("doGesture", (data) => {
     const room = getRoomState(roomName);
+    room.lastActivity = Date.now();
     
     if (room.gestureActive && data.gesture === room.currentGesture) {
       room.usersDoingGesture.add(socket.id);
