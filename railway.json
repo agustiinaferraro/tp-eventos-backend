@@ -1,9 +1,0 @@
-{
-  "build": {
-    "builder": "NIXPACKS",
-    "nixpacks": {
-      "installCommand": "yarn install",
-      "startCommand": "yarn start"
-    }
-  }
-}
