@@ -1,126 +1,425 @@
 // IMPORTACIÓN DE LIBRERÍAS
 
-// Express → framework para crear servidor web
 const express = require("express");
-
-// http → módulo nativo de Node para crear servidor
 const http = require("http");
-
-// Socket.IO → permite comunicación en tiempo real
 const { Server } = require("socket.io");
+const config = require("./config");
 
 // CREACIÓN DEL SERVIDOR
 
-// Inicializamos express
 const app = express();
-
-// Creamos servidor HTTP usando express
 const server = http.createServer(app);
-
 
 // CONFIGURACIÓN DE SOCKET.IO
 
-// Creamos instancia de Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: "*" // permite conexiones desde cualquier origen (útil para pruebas)
+    origin: "*"
   }
 });
 
+// ESTADO DE LAS SALAS
 
-// ESTADO GLOBAL DEL SISTEMA
+const rooms = {};
 
-// Acumulador de puntos colectivos
-let globalPoints = 0;
+const GESTURES = ["pump", "wave", "shake", "rotate"];
+const THRESHOLD_PERCENT = 0.8;
+const THRESHOLDS = [0, 50, 500, 1000];
+const GESTURE_DURATION = 3000;
+const REPETITIONS_NEEDED = 5;
+const ACTIVITY_THRESHOLD = 3;
 
-// Estado visual actual (color global)
-let currentColor = "orange";
+function getRoomState(roomName) {
+  if (!rooms[roomName]) {
+    rooms[roomName] = {
+      points: 0,
+      color: "orange",
+      activeUsers: new Set(),
+      gestureActive: false,
+      currentGesture: null,
+      gestureStartTime: null,
+      usersDoingGesture: new Set(),
+      gestureRepetitions: new Map(),
+      lastThresholdIndex: 0,
+      gestureTimer: null,
+      freeMovementPhase: true,
+      usersMoving: new Set(),
+      moveRepetitions: new Map(),
+      nearThreshold: false
+    };
+  }
+  return rooms[roomName];
+}
 
-// FUNCIÓN: ACTUALIZAR ESTADO
-
-// Define el color según los puntos acumulados
-function updateState() {
-
-  if (globalPoints >= 1000) {
-    currentColor = "green";
-
-  } else if (globalPoints >= 500) {
-    currentColor = "yellow";
-
+function updateRoomState(roomName) {
+  const room = rooms[roomName];
+  
+  if (room.points >= 1000) {
+    room.color = "green";
+  } else if (room.points >= 500) {
+    room.color = "yellow";
   } else {
-    currentColor = "orange";
+    room.color = "orange";
+  }
+  
+  return room;
+}
+
+function getNextThreshold(currentPoints) {
+  for (let i = THRESHOLDS.length - 1; i >= 0; i--) {
+    if (currentPoints < THRESHOLDS[i]) {
+      return THRESHOLDS[i];
+    }
+  }
+  return THRESHOLDS[THRESHOLDS.length - 1];
+}
+
+function checkAndTriggerGesture(roomName) {
+  const room = rooms[roomName];
+  
+  if (room.gestureActive) return;
+  if (room.points >= 1000) return;
+  
+  const currentThreshold = room.lastThresholdIndex > 0 ? THRESHOLDS[room.lastThresholdIndex] : 0;
+  const nextThreshold = getNextThreshold(room.points);
+  
+  if (nextThreshold > currentThreshold && room.points >= nextThreshold - 50 && room.points < nextThreshold) {
+    startGesture(roomName);
+  }
+}
+
+function checkGestureCompletion(roomName) {
+  const room = rooms[roomName];
+  
+  if (room.gestureActive) return;
+  if (room.points >= 1000) return;
+  
+  const currentThresholdIndex = THRESHOLDS.indexOf(getNextThreshold(room.points));
+  const nextThreshold = THRESHOLDS[currentThresholdIndex + 1];
+  
+  if (!nextThreshold) return;
+  
+  if (room.points >= nextThreshold - 30 && room.points < nextThreshold && !room.nearThreshold) {
+    room.nearThreshold = true;
+    room.freeMovementPhase = false;
+    
+    io.to(roomName).emit("nearThreshold", {
+      threshold: nextThreshold,
+      current: room.points
+    });
+  } else if (room.points < nextThreshold - 50 && room.nearThreshold) {
+    room.nearThreshold = false;
+    room.freeMovementPhase = true;
+  }
+}
+
+function checkGestureSuccess(roomName) {
+  const room = rooms[roomName];
+  
+  if (room.usersDoingGesture.size === 0) {
+    room.gestureActive = false;
+    room.currentGesture = null;
+    room.usersDoingGesture.clear();
+    room.gestureRepetitions.clear();
+    if (room.gestureTimer) {
+      clearTimeout(room.gestureTimer);
+      room.gestureTimer = null;
+    }
+    io.to(roomName).emit("stateUpdate", {
+      points: room.points,
+      color: room.color,
+      room: roomName,
+      gestureActive: false,
+      gesturePhase: "free"
+    });
+    return;
+  }
+  
+  const participation = room.usersDoingGesture.size / room.activeUsers.size;
+  const currentThresholdIndex = THRESHOLDS.indexOf(getNextThreshold(room.points)) - 1;
+  const nextThreshold = THRESHOLDS[currentThresholdIndex + 1] || 1000;
+  
+  if (participation >= THRESHOLD_PERCENT) {
+    const pointsToAdd = Math.max(0, nextThreshold - room.points);
+    room.points = Math.min(1000, room.points + pointsToAdd);
+    room.lastThresholdIndex = currentThresholdIndex + 1;
+    room.freeMovementPhase = true;
+    room.nearThreshold = false;
+    
+    io.to(roomName).emit("gestureSuccess", {
+      gesture: room.currentGesture,
+      participation: Math.round(participation * 100),
+      pointsAdded: pointsToAdd
+    });
+    
+    console.log(`Sala ${roomName} - Gesto exitoso! ${Math.round(participation * 100)}% participó, +${pointsToAdd} puntos`);
+    
+    updateRoomState(roomName);
+    io.to(roomName).emit("stateUpdate", {
+      points: room.points,
+      color: room.color,
+      room: roomName,
+      gestureActive: false,
+      gesturePhase: "free"
+    });
+  } else {
+    io.to(roomName).emit("gestureFailed", {
+      gesture: room.currentGesture,
+      participation: Math.round(participation * 100),
+      needed: Math.round(THRESHOLD_PERCENT * 100)
+    });
+    
+    console.log(`Sala ${roomName} - Gesto falló: ${Math.round(participation * 100)}% (necesitaba 80%)`);
+    
+    room.freeMovementPhase = true;
+    room.nearThreshold = false;
+    
+    io.to(roomName).emit("stateUpdate", {
+      points: room.points,
+      color: room.color,
+      room: roomName,
+      gestureActive: false,
+      gesturePhase: "free"
+    });
+  }
+  
+  room.gestureActive = false;
+  room.currentGesture = null;
+  room.usersDoingGesture.clear();
+  room.gestureRepetitions.clear();
+  room.gestureStartTime = null;
+  
+  if (room.gestureTimer) {
+    clearTimeout(room.gestureTimer);
+    room.gestureTimer = null;
+  }
+}
+
+function startGesture(roomName) {
+  const room = getRoomState(roomName);
+  
+  room.gestureActive = true;
+  room.currentGesture = GESTURES[Math.floor(Math.random() * GESTURES.length)];
+  room.gestureStartTime = Date.now();
+  room.usersDoingGesture.clear();
+  
+  io.to(roomName).emit("gestureStart", {
+    gesture: room.currentGesture,
+    duration: GESTURE_DURATION
+  });
+  
+  console.log(`Sala ${roomName} - Gesto iniciado: ${room.currentGesture}`);
+  
+  room.gestureTimer = setTimeout(() => {
+    checkGestureSuccess(roomName);
+  }, GESTURE_DURATION);
+}
+
+function emitGestureStatus(roomName) {
+  const room = rooms[roomName];
+  if (!room.gestureActive) return;
+  
+  const participation = room.activeUsers.size > 0 
+    ? Math.round((room.usersDoingGesture.size / room.activeUsers.size) * 100) 
+    : 0;
+  
+  io.to(roomName).emit("gestureStatus", {
+    doingGesture: room.usersDoingGesture.size,
+    totalUsers: room.activeUsers.size,
+    participation: participation
+  });
+}
+
+function checkMovementProgress(roomName) {
+  const room = rooms[roomName];
+  
+  const currentThresholdIndex = THRESHOLDS.indexOf(getNextThreshold(room.points));
+  const nextThreshold = THRESHOLDS[currentThresholdIndex + 1];
+  
+  if (!nextThreshold || room.points >= nextThreshold - 30) return;
+  
+  const eligibleUsers = [];
+  room.moveRepetitions.forEach((count, userId) => {
+    if (count >= REPETITIONS_NEEDED) {
+      eligibleUsers.push(userId);
+    }
+  });
+  
+  if (eligibleUsers.length >= Math.ceil(room.activeUsers.size * THRESHOLD_PERCENT) && room.activeUsers.size >= 2) {
+    const pointsNeeded = nextThreshold - room.points;
+    const pointsPerUser = Math.floor(pointsNeeded / eligibleUsers.length);
+    
+    eligibleUsers.forEach(userId => {
+      room.points = Math.min(1000, room.points + pointsPerUser);
+    });
+    
+    room.moveRepetitions.clear();
+    room.usersMoving.clear();
+    
+    io.to(roomName).emit("movementBonus", {
+      usersParticipating: eligibleUsers.length,
+      totalUsers: room.activeUsers.size,
+      pointsAdded: pointsNeeded
+    });
+    
+    updateRoomState(roomName);
+    io.to(roomName).emit("stateUpdate", {
+      points: room.points,
+      color: room.color,
+      room: roomName,
+      gestureActive: false,
+      gesturePhase: "free"
+    });
+    
+    checkGestureCompletion(roomName);
   }
 }
 
 // CONEXIÓN DE USUARIOS
 
-// Se ejecuta cada vez que un usuario se conecta
 io.on("connection", (socket) => {
+  const roomName = socket.handshake.query.room || "default";
+  
+  socket.join(roomName);
+  console.log(`Usuario ${socket.id} conectado a sala: ${roomName}`);
 
-  console.log("Usuario conectado:", socket.id);
-
-  // ENVIAR ESTADO INICIAL
-
-  // Cuando alguien entra, recibe el estado actual
+  const room = getRoomState(roomName);
+  room.activeUsers.add(socket.id);
+  
   socket.emit("stateUpdate", {
-    points: globalPoints,
-    color: currentColor
+    points: room.points,
+    color: room.color,
+    room: roomName,
+    gestureActive: room.gestureActive,
+    currentGesture: room.currentGesture,
+    gestureDuration: room.gestureActive ? GESTURE_DURATION : 0,
+    gesturePhase: room.freeMovementPhase ? "free" : "sync",
+    nearThreshold: room.nearThreshold
   });
-
-
-  // RECIBIR ENERGÍA (INTERACCIÓN)
+  
+  emitGestureStatus(roomName);
 
   socket.on("energy", (data) => {
-
-    // Extraemos la energía enviada
+    const room = getRoomState(roomName);
     const energy = data.energy || 0;
 
-    // 🚫 si ya llegó a 1000, no suma más
-    if (globalPoints >= 1000) return;
+    if (room.points >= 1000) return;
 
-    // Sumamos al total global
-    globalPoints += energy;
-
-    // 🟡 evitamos que pase de 1000
-    if (globalPoints > 1000) {
-      globalPoints = 1000;
+    const oldPoints = room.points;
+    room.points += energy;
+    if (room.points > 1000) {
+      room.points = 1000;
     }
 
-    // Actualizamos el estado (color)
-    updateState();
+    const updatedRoom = updateRoomState(roomName);
 
-    console.log("Puntos:", globalPoints);
+    console.log(`Sala ${roomName} - Puntos: ${updatedRoom.points}`);
 
-    // EMITIR A TODOS LOS USUARIOS
-
-    // Enviamos el nuevo estado a TODOS los conectados
-    io.emit("stateUpdate", {
-      points: globalPoints,
-      color: currentColor
+    io.to(roomName).emit("stateUpdate", {
+      points: updatedRoom.points,
+      color: updatedRoom.color,
+      room: roomName,
+      gestureActive: room.gestureActive,
+      currentGesture: room.currentGesture,
+      gesturePhase: room.freeMovementPhase ? "free" : "sync",
+      nearThreshold: room.nearThreshold
     });
+    
+    if (oldPoints < room.points) {
+      checkGestureCompletion(roomName);
+    }
+  });
+  
+  socket.on("doGesture", (data) => {
+    const room = getRoomState(roomName);
+    
+    if (room.gestureActive && data.gesture === room.currentGesture) {
+      room.usersDoingGesture.add(socket.id);
+      emitGestureStatus(roomName);
+    } else if (room.freeMovementPhase && room.nearThreshold) {
+      const currentCount = room.moveRepetitions.get(socket.id) || 0;
+      room.moveRepetitions.set(socket.id, currentCount + 1);
+      room.usersMoving.add(socket.id);
+      
+      if (currentCount + 1 >= REPETITIONS_NEEDED) {
+        checkMovementProgress(roomName);
+      }
+    }
+  });
+  
+  socket.on("startGestureEvent", () => {
+    const room = getRoomState(roomName);
+    if (!room.gestureActive && room.points < 1000) {
+      startGesture(roomName);
+    }
   });
 
-  // 🔄 RESET DEL SISTEMA
   socket.on("reset", () => {
+    const room = getRoomState(roomName);
+    room.points = 0;
+    room.color = "orange";
+    room.lastThresholdIndex = 0;
+    
+    if (room.gestureTimer) {
+      clearTimeout(room.gestureTimer);
+      room.gestureTimer = null;
+    }
+    room.gestureActive = false;
+    room.currentGesture = null;
+    room.usersDoingGesture.clear();
+    room.gestureRepetitions.clear();
+    room.freeMovementPhase = true;
+    room.nearThreshold = false;
+    room.usersMoving.clear();
+    room.moveRepetitions.clear();
 
-    globalPoints = 0;
-    currentColor = "orange";
-
-    io.emit("stateUpdate", {
-      points: globalPoints,
-      color: currentColor
+    io.to(roomName).emit("stateUpdate", {
+      points: 0,
+      color: "orange",
+      room: roomName,
+      gestureActive: false
     });
 
-    console.log("🔄 Reset ejecutado");
+    console.log(`Sala ${roomName} - Reset ejecutado`);
   });
 
-  // DESCONEXIÓN
   socket.on("disconnect", () => {
-    console.log("Usuario desconectado:", socket.id);
+    const room = rooms[roomName];
+    if (room) {
+      room.activeUsers.delete(socket.id);
+      room.usersDoingGesture.delete(socket.id);
+      emitGestureStatus(roomName);
+    }
+    console.log(`Usuario ${socket.id} desconectado de sala: ${roomName}`);
+  });
+});
+
+// API: listar salas
+
+app.get("/api/rooms", (req, res) => {
+  const roomList = Object.keys(io.sockets.adapter.rooms);
+  res.json({ rooms: roomList });
+});
+
+// API: info de sala
+
+app.get("/api/rooms/:name", (req, res) => {
+  const room = rooms[req.params.name];
+  if (!room) {
+    return res.json({ error: "Sala no encontrada" });
+  }
+  res.json({
+    points: room.points,
+    color: room.color,
+    activeUsers: room.activeUsers.size,
+    gestureActive: room.gestureActive,
+    currentGesture: room.currentGesture
   });
 });
 
 // INICIAR SERVIDOR
-server.listen(3000, () => {
-  console.log("Servidor corriendo en http://localhost:3000");
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Servidor corriendo en ${config.serverUrl}`);
 });

@@ -5,7 +5,8 @@
   "license": "MIT",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "ngrok": "ngrok http 3000"
   },
   "dependencies": {
     "express": "^5.2.1",
