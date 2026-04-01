@@ -323,7 +323,7 @@ io.on("connection", (socket) => {
     room.lastActivity = Date.now();
 
     if (room.points >= 1000) return;
-    if (energy > 10) return;
+    if (energy > 20) return;
 
     const oldPoints = room.points;
     room.points += energy;
