@@ -566,12 +566,15 @@ app.get("/api/stats/:sala", async (req, res) => {
       .filter(s => s.type === "energy")
       .reduce((sum, s) => sum + (s.energy || 0), 0);
     
+    const room = io.sockets.adapter.rooms.get(sala);
+    const activeConnections = room ? room.size : 0;
+    
     res.json({
       stats,
       summary: {
         connections,
         disconnections,
-        activeConnections: 0,
+        activeConnections,
         totalEnergy
       }
     });
