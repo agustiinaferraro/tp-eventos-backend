@@ -546,6 +546,10 @@ app.post("/api/users/:uid/salas", async (req, res) => {
 // =====================
 
 app.get("/api/stats/:sala", async (req, res) => {
+  if (!db) {
+    return res.json({ stats: [], summary: { connections: 0, disconnections: 0, currentUsers: 0, totalEnergy: 0 } });
+  }
+  
   try {
     const { sala } = req.params;
     const { limit = 100 } = req.query;
@@ -573,7 +577,7 @@ app.get("/api/stats/:sala", async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Error al obtener estadísticas" });
+    res.json({ stats: [], summary: { connections: 0, disconnections: 0, currentUsers: 0, totalEnergy: 0 } });
   }
 });
 
@@ -587,5 +591,7 @@ initMongo().then(() => {
   });
 }).catch(err => {
   console.error("Error conectando a MongoDB:", err);
-  process.exit(1);
+  server.listen(PORT, () => {
+    console.log(`Servidor corriendo SIN MongoDB en ${config.serverUrl}`);
+  });
 });
