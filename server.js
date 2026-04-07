@@ -41,7 +41,10 @@ const initMongo = async () => {
 const rooms = {};
 
 async function saveStat(roomName, type, data = {}) {
-  if (!db) return;
+  if (!db) {
+    console.log("saveStat: db no está definido");
+    return;
+  }
   try {
     await db.collection("stats").insertOne({
       room: roomName,
@@ -49,6 +52,7 @@ async function saveStat(roomName, type, data = {}) {
       timestamp: new Date(),
       ...data
     });
+    console.log("Stat guardado:", roomName, type);
   } catch (err) {
     console.error("Error guardando stat:", err.message);
   }
