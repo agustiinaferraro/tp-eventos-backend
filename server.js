@@ -40,6 +40,20 @@ const initMongo = async () => {
 
 const rooms = {};
 
+async function saveStat(roomName, type, data = {}) {
+  if (!db) return;
+  try {
+    await db.collection("stats").insertOne({
+      room: roomName,
+      type,
+      timestamp: new Date(),
+      ...data
+    });
+  } catch (err) {
+    console.error("Error guardando stat:", err.message);
+  }
+}
+
 const GESTURES = ["pump", "wave", "shake", "rotate"];
 const THRESHOLD_PERCENT = 0.8;
 const THRESHOLDS = [0, 50, 500, 1000];
@@ -317,6 +331,8 @@ io.on("connection", (socket) => {
   
   socket.join(roomName);
   console.log(`Usuario ${socket.id} conectado a sala: ${roomName}`);
+  
+  saveStat(roomName, "connect", { socketId: socket.id });
 
   const room = getRoomState(roomName);
   room.activeUsers.add(socket.id);
@@ -352,6 +368,8 @@ io.on("connection", (socket) => {
     const updatedRoom = updateRoomState(roomName);
 
     console.log(`Sala ${roomName} - Puntos: ${updatedRoom.points} (+${energy})`);
+    
+    saveStat(roomName, "energy", { energy, totalPoints: updatedRoom.points });
 
     io.to(roomName).emit("stateUpdate", {
       points: updatedRoom.points,
@@ -430,6 +448,7 @@ io.on("connection", (socket) => {
       emitGestureStatus(roomName);
     }
     console.log(`Usuario ${socket.id} desconectado de sala: ${roomName}`);
+    saveStat(roomName, "disconnect", { socketId: socket.id });
   });
 });
 
@@ -519,6 +538,42 @@ app.post("/api/users/:uid/salas", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error al guardar salas" });
+  }
+});
+
+// =====================
+// API: ESTADÍSTICAS
+// =====================
+
+app.get("/api/stats/:sala", async (req, res) => {
+  try {
+    const { sala } = req.params;
+    const { limit = 100 } = req.query;
+    
+    const stats = await db.collection("stats")
+      .find({ room: sala })
+      .sort({ timestamp: -1 })
+      .limit(parseInt(limit))
+      .toArray();
+    
+    const connections = stats.filter(s => s.type === "connect").length;
+    const disconnections = stats.filter(s => s.type === "disconnect").length;
+    const totalEnergy = stats
+      .filter(s => s.type === "energy")
+      .reduce((sum, s) => sum + (s.energy || 0), 0);
+    
+    res.json({
+      stats,
+      summary: {
+        connections,
+        disconnections,
+        currentUsers: connections - disconnections,
+        totalEnergy
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener estadísticas" });
   }
 });
 
