@@ -547,7 +547,7 @@ app.post("/api/users/:uid/salas", async (req, res) => {
 
 app.get("/api/stats/:sala", async (req, res) => {
   if (!db) {
-    return res.json({ stats: [], summary: { connections: 0, disconnections: 0, currentUsers: 0, totalEnergy: 0 } });
+    return res.json({ stats: [], summary: { connections: 0, disconnections: 0, activeConnections: 0, totalEnergy: 0 } });
   }
   
   try {
@@ -571,13 +571,13 @@ app.get("/api/stats/:sala", async (req, res) => {
       summary: {
         connections,
         disconnections,
-        currentUsers: connections - disconnections,
+        activeConnections: 0,
         totalEnergy
       }
     });
   } catch (err) {
     console.error(err);
-    res.json({ stats: [], summary: { connections: 0, disconnections: 0, currentUsers: 0, totalEnergy: 0 } });
+    res.json({ stats: [], summary: { connections: 0, disconnections: 0, activeConnections: 0, totalEnergy: 0 } });
   }
 });
 
