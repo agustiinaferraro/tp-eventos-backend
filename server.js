@@ -22,6 +22,9 @@ const io = new Server(server, {
 
 const rooms = {};
 
+// ESTADO DE USUARIOS (en memoria - simple para demo)
+const users = {};
+
 const GESTURES = ["pump", "wave", "shake", "rotate"];
 const THRESHOLD_PERCENT = 0.8;
 const THRESHOLDS = [0, 50, 500, 1000];
@@ -436,6 +439,46 @@ app.get("/api/rooms/:name", (req, res) => {
     gestureActive: room.gestureActive,
     currentGesture: room.currentGesture
   });
+});
+
+// =====================
+// API: PERFILES DE USUARIO
+// =====================
+
+app.get("/api/users/:uid/profiles", (req, res) => {
+  const { uid } = req.params;
+  const userData = users[uid] || {};
+  res.json({ profiles: userData.profiles || [] });
+});
+
+app.post("/api/users/:uid/profiles", (req, res) => {
+  const { uid } = req.params;
+  const { profiles } = req.body;
+  
+  if (!users[uid]) users[uid] = {};
+  users[uid].profiles = profiles;
+  
+  res.json({ success: true, profiles });
+});
+
+// =====================
+// API: SALAS DE USUARIO
+// =====================
+
+app.get("/api/users/:uid/salas", (req, res) => {
+  const { uid } = req.params;
+  const userData = users[uid] || {};
+  res.json({ salas: userData.salas || [] });
+});
+
+app.post("/api/users/:uid/salas", (req, res) => {
+  const { uid } = req.params;
+  const { salas } = req.body;
+  
+  if (!users[uid]) users[uid] = {};
+  users[uid].salas = salas;
+  
+  res.json({ success: true, salas });
 });
 
 // INICIAR SERVIDOR
