@@ -1,9 +1,11 @@
 // IMPORTACIÓN DE LIBRERÍAS
 
+require("dotenv").config();
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
+const { MongoClient, ObjectId } = require("mongodb");
 const config = require("./config");
 
 // CREACIÓN DEL SERVIDOR
@@ -21,12 +23,19 @@ const io = new Server(server, {
   }
 });
 
+// MONGO DB
+
+let db;
+const initMongo = async () => {
+  const client = new MongoClient(config.mongodbUri);
+  await client.connect();
+  db = client.db("tp-eventos");
+  console.log("Conectado a MongoDB");
+};
+
 // ESTADO DE LAS SALAS
 
 const rooms = {};
-
-// ESTADO DE USUARIOS (en memoria - simple para demo)
-const users = {};
 
 const GESTURES = ["pump", "wave", "shake", "rotate"];
 const THRESHOLD_PERCENT = 0.8;
@@ -445,48 +454,80 @@ app.get("/api/rooms/:name", (req, res) => {
 });
 
 // =====================
-// API: PERFILES DE USUARIO
+// API: PERFILES DE USUARIO (MongoDB)
 // =====================
 
-app.get("/api/users/:uid/profiles", (req, res) => {
-  const { uid } = req.params;
-  const userData = users[uid] || {};
-  res.json({ profiles: userData.profiles || [] });
+app.get("/api/users/:uid/profiles", async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const user = await db.collection("users").findOne({ uid });
+    res.json({ profiles: user?.profiles || [] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener perfiles" });
+  }
 });
 
-app.post("/api/users/:uid/profiles", (req, res) => {
-  const { uid } = req.params;
-  const { profiles } = req.body;
-  
-  if (!users[uid]) users[uid] = {};
-  users[uid].profiles = profiles;
-  
-  res.json({ success: true, profiles });
+app.post("/api/users/:uid/profiles", async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const { profiles } = req.body;
+    
+    await db.collection("users").updateOne(
+      { uid },
+      { $set: { profiles } },
+      { upsert: true }
+    );
+    
+    res.json({ success: true, profiles });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al guardar perfiles" });
+  }
 });
 
 // =====================
-// API: SALAS DE USUARIO
+// API: SALAS DE USUARIO (MongoDB)
 // =====================
 
-app.get("/api/users/:uid/salas", (req, res) => {
-  const { uid } = req.params;
-  const userData = users[uid] || {};
-  res.json({ salas: userData.salas || [] });
+app.get("/api/users/:uid/salas", async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const user = await db.collection("users").findOne({ uid });
+    res.json({ salas: user?.salas || [] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener salas" });
+  }
 });
 
-app.post("/api/users/:uid/salas", (req, res) => {
-  const { uid } = req.params;
-  const { salas } = req.body;
-  
-  if (!users[uid]) users[uid] = {};
-  users[uid].salas = salas;
-  
-  res.json({ success: true, salas });
+app.post("/api/users/:uid/salas", async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const { salas } = req.body;
+    
+    await db.collection("users").updateOne(
+      { uid },
+      { $set: { salas } },
+      { upsert: true }
+    );
+    
+    res.json({ success: true, salas });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al guardar salas" });
+  }
 });
 
 // INICIAR SERVIDOR
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Servidor corriendo en ${config.serverUrl}`);
+
+initMongo().then(() => {
+  server.listen(PORT, () => {
+    console.log(`Servidor corriendo en ${config.serverUrl}`);
+  });
+}).catch(err => {
+  console.error("Error conectando a MongoDB:", err);
+  process.exit(1);
 });
