@@ -41,18 +41,14 @@ const initMongo = async () => {
 const rooms = {};
 
 async function saveStat(roomName, type, data = {}) {
-  if (!db) {
-    console.log("saveStat: db no está definido");
-    return;
-  }
+  if (!db) return;
   try {
     await db.collection("stats").insertOne({
-      room: roomName,
+      room: roomName.toLowerCase(),
       type,
       timestamp: new Date(),
       ...data
     });
-    console.log("Stat guardado:", roomName, type);
   } catch (err) {
     console.error("Error guardando stat:", err.message);
   }
@@ -555,7 +551,7 @@ app.get("/api/stats/:sala", async (req, res) => {
   }
   
   try {
-    const { sala } = req.params;
+    const sala = req.params.sala.toLowerCase();
     const { limit = 100 } = req.query;
     
     const stats = await db.collection("stats")
