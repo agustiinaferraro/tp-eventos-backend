@@ -27,10 +27,15 @@ const io = new Server(server, {
 
 let db;
 const initMongo = async () => {
-  const client = new MongoClient(config.mongodbUri);
-  await client.connect();
-  db = client.db("tp-eventos");
-  console.log("Conectado a MongoDB");
+  console.log("MongoDB URI:", config.mongodbUri ? "configurada" : "NO CONFIGURADA");
+  try {
+    const client = new MongoClient(config.mongodbUri);
+    await client.connect();
+    db = client.db("tp-eventos");
+    console.log("Conectado a MongoDB");
+  } catch (err) {
+    console.error("Error conectando a MongoDB:", err.message);
+  }
 };
 
 // ESTADO DE LAS SALAS
