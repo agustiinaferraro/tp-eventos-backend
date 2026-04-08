@@ -1,3 +1,13 @@
+// ============================================================
+// IMPORTANTE - NOTA SOBRE DESPLIEGUE
+// ============================================================
+// El backend se deploya en Railway. El día 08/04/2026 Railway tuvo
+// problemas con su CDN que impide el funcionamiento correcto de CORS.
+// Las APIs devuelven 404 cacheados sin headers de CORS.
+// Más info: https://railway.com/project/...
+// Estado: En espera de resolución por parte de Railway.
+// ============================================================
+
 // IMPORTACIÓN DE LIBRERÍAS
 
 require("dotenv").config();
