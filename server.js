@@ -492,9 +492,11 @@ app.get("/api/users/:uid/profiles", async (req, res) => {
   try {
     const { uid } = req.params;
     const user = await db.collection("users").findOne({ uid });
+    res.set("Cache-Control", "no-store");
     res.json({ profiles: user?.profiles || [] });
   } catch (err) {
     console.error(err);
+    res.set("Cache-Control", "no-store");
     res.status(500).json({ error: "Error al obtener perfiles" });
   }
 });
@@ -510,9 +512,11 @@ app.post("/api/users/:uid/profiles", async (req, res) => {
       { upsert: true }
     );
     
+    res.set("Cache-Control", "no-store");
     res.json({ success: true, profiles });
   } catch (err) {
     console.error(err);
+    res.set("Cache-Control", "no-store");
     res.status(500).json({ error: "Error al guardar perfiles" });
   }
 });
