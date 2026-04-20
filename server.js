@@ -38,6 +38,38 @@ app.get("/", (req, res) => {
   res.send("Energía Colectiva API OK");
 });
 
+// Ruta para generar imagen con IA
+app.post("/api/generate-image", async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    
+    const response = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        prompt: prompt + " abstract background for music event, vibrant colors, no text",
+        n: 1,
+        size: "1024x1024",
+        quality: "standard"
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.error) {
+      res.status(400).json({ error: data.error.message });
+      return;
+    }
+    
+    res.json({ imageUrl: data.data[0].url });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const server = http.createServer(app);
 
 // CONFIGURACIÓN DE SOCKET.IO
