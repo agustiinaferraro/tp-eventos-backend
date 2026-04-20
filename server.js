@@ -43,6 +43,8 @@ app.post("/api/generate-image", async (req, res) => {
   try {
     const { prompt } = req.body;
     
+    console.log("OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "EXISTS" : "UNDEFINED");
+    
     const response = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
