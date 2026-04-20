@@ -43,13 +43,14 @@ app.post("/api/generate-image", async (req, res) => {
   try {
     const { prompt } = req.body;
     
-    console.log("OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "EXISTS" : "UNDEFINED");
+    const apiKey = process.env.OPENAI_API_KEY;
+    console.log("OPENAI_API_KEY first chars:", apiKey ? apiKey.substring(0, 10) : "UNDEFINED");
     
     const response = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+        "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         prompt: prompt + " abstract background for music event, vibrant colors, no text",
