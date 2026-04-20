@@ -35,7 +35,7 @@ app.use(express.json({ limit: '50mb' }));
 
 // Ruta base
 app.get("/", (req, res) => {
-  res.send("Energía Colectiva API OK");
+  res.send("Energía Colectiva API OK - AI ready: " + (process.env.OPENAI_API_KEY ? "YES" : "NO"));
 });
 
 // Ruta para generar imagen con IA
