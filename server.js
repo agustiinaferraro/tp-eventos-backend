@@ -32,6 +32,12 @@ app.use((req, res, next) => {
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
+// Ruta base
+app.get("/", (req, res) => {
+  res.send("Energía Colectiva API OK");
+});
+
 const server = http.createServer(app);
 
 // CONFIGURACIÓN DE SOCKET.IO
