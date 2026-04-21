@@ -605,6 +605,68 @@ app.post("/api/users/:uid/salas", async (req, res) => {
 });
 
 // =====================
+// API: EXPERIENCIA DE SALA (MongoDB)
+// =====================
+
+const DEFAULT_EXPERIENCE = {
+  level0: {
+    color: "#ff6b00",
+    background: null,
+    backgroundImage: null,
+    particles: true,
+    message: "¡Sumá tu energía!"
+  },
+  level1: {
+    color: "#ffdd00",
+    background: null,
+    backgroundImage: null,
+    particles: true,
+    message: "¡Casi llegamos!"
+  },
+  level2: {
+    color: "#00ff88",
+    background: null,
+    backgroundImage: null,
+    particles: true,
+    message: "¡Nivel máximo!"
+  },
+  effects: {
+    particleCount: 40,
+    showGestures: true,
+    showNearThreshold: true
+  }
+};
+
+app.get("/api/salas/:name/experience", async (req, res) => {
+  try {
+    const { name } = req.params;
+    const sala = await db.collection("experiences").findOne({ name: name.toLowerCase() });
+    res.json({ experience: sala?.experience || DEFAULT_EXPERIENCE });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener experiencia" });
+  }
+});
+
+app.post("/api/salas/:name/experience", async (req, res) => {
+  try {
+    const { name } = req.params;
+    const { experience } = req.body;
+    
+    await db.collection("experiences").updateOne(
+      { name: name.toLowerCase() },
+      { $set: { experience, updatedAt: new Date() } },
+      { upsert: true }
+    );
+    
+    res.json({ success: true, experience });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al guardar experiencia" });
+  }
+});
+
+// =====================
 // API: ESTADÍSTICAS
 // =====================
 
