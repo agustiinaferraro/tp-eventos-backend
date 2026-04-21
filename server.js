@@ -38,26 +38,37 @@ app.get("/", (req, res) => {
   res.send("Energía Colectiva API OK - AI ready: " + (process.env.OPENAI_API_KEY ? "YES" : "NO"));
 });
 
-// Ruta para generar imagen con IA
+// Ruta para generar imagen con IA (FluxImageGen - nano-banana style)
 app.post("/api/generate-image", async (req, res) => {
   try {
     const { prompt } = req.body;
     
-    const apiKey = process.env.OPENAI_API_KEY;
-    console.log("OPENAI_API_KEY first chars:", apiKey ? apiKey.substring(0, 10) : "UNDEFINED");
-    
-    const response = await fetch("https://api.openai.com/v1/images/generations", {
+    const response = await fetch("https://fluximagegen.com/api/generate", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        prompt: prompt + " abstract background for music event, vibrant colors, no text",
-        n: 1,
-        size: "1024x1024"
+        prompt: prompt,
+        style: "nano-banana"
       })
     });
+    
+    const data = await response.json();
+    
+    if (!data.success) {
+      res.status(400).json({ error: data.error || "Generation failed" });
+      return;
+    }
+    
+    res.json({ 
+      imageUrl: data.imageUrl,
+      remainingGenerations: data.remainingGenerations
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
     
     const data = await response.json();
     
