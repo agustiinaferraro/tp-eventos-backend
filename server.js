@@ -67,19 +67,6 @@ app.post("/api/generate-image", async (req, res) => {
   }
 });
 */
-    
-    const data = await response.json();
-    
-    if (data.error) {
-      res.status(400).json({ error: data.error.message });
-      return;
-    }
-    
-    res.json({ imageUrl: data.data[0].url });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
 const server = http.createServer(app);
 
