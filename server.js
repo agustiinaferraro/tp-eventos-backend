@@ -38,6 +38,38 @@ app.get("/", (req, res) => {
   res.send("Energía Colectiva API OK - AI ready: " + (process.env.OPENAI_API_KEY ? "YES" : "NO"));
 });
 
+// Ruta para generar imagen con IA (FluxImageGen - nano-banana style)
+app.post("/api/generate-image", async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    
+    const response = await fetch("https://fluximagegen.com/api/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        prompt: prompt,
+        style: "nano-banana"
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (!data.success) {
+      res.status(400).json({ error: data.error || "Generation failed" });
+      return;
+    }
+    
+    res.json({ 
+      imageUrl: data.imageUrl,
+      remainingGenerations: data.remainingGenerations
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 
 const server = http.createServer(app);
