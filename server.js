@@ -38,33 +38,33 @@ app.get("/", (req, res) => {
   res.send("Energía Colectiva API OK - AI ready: " + (process.env.OPENAI_API_KEY ? "YES" : "NO"));
 });
 
-// Ruta para generar imagen con IA (FluxImageGen - nano-banana style)
+// Ruta para generar imagen con IA (Raphael AI - nano-banana powered)
 app.post("/api/generate-image", async (req, res) => {
   try {
     const { prompt } = req.body;
     
-    const response = await fetch("https://fluximagegen.com/api/generate", {
+    // Raphael AI - free, unlimited, Nano Banana powered
+    const response = await fetch("https://raphael.ai/api/t2i", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        prompt: prompt,
-        style: "nano-banana"
+        prompt: prompt
       })
     });
     
     const data = await response.json();
     
-    if (!data.success) {
-      res.status(400).json({ error: data.error || "Generation failed" });
+    // Handle different response formats
+    const imageUrl = data.url || data.image_url || data.generated_image || data.images?.[0];
+    
+    if (!imageUrl) {
+      res.status(400).json({ error: "Generation failed" });
       return;
     }
     
-    res.json({ 
-      imageUrl: data.imageUrl,
-      remainingGenerations: data.remainingGenerations
-    });
+    res.json({ imageUrl: imageUrl });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
