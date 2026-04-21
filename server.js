@@ -38,35 +38,7 @@ app.get("/", (req, res) => {
   res.send("Energía Colectiva API OK - AI ready: " + (process.env.OPENAI_API_KEY ? "YES" : "NO"));
 });
 
-// Ruta para generar imagen con IA
-// NOTA: Deshabilitada temporalmente - las APIs gratuitas no funcionan reliably
-// Para habilitar, usar una API key de Leonardo.ai u otra API de pago
-/*
-app.post("/api/generate-image", async (req, res) => {
-  try {
-    const { prompt } = req.body;
-    // Usar API key configurada en Railway Variables
-    const apiKey = process.env.IMAGE_API_KEY;
-    if (!apiKey) {
-      res.status(500).json({ error: "API key no configurada" });
-      return;
-    }
-    // Implementar con Leonardo u otra API
-    const response = await fetch("https://gateway.leonardo.ai/v1/generation", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({ prompt })
-    });
-    const data = await response.json();
-    res.json({ imageUrl: data.generated_image });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-*/
+
 
 const server = http.createServer(app);
 
