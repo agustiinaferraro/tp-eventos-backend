@@ -38,33 +38,31 @@ app.get("/", (req, res) => {
   res.send("Energía Colectiva API OK - AI ready: " + (process.env.OPENAI_API_KEY ? "YES" : "NO"));
 });
 
-// Ruta para generar imagen con IA (Raphael AI - nano-banana powered)
+// Ruta para generar imagen con IA (SubNP free API)
 app.post("/api/generate-image", async (req, res) => {
   try {
     const { prompt } = req.body;
     
-    // Raphael AI - free, unlimited, Nano Banana powered
-    const response = await fetch("https://raphael.ai/api/t2i", {
+    // SubNP free API
+    const response = await fetch("https://subnp.com/api/free/generate", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        prompt: prompt
+        prompt: prompt,
+        model: "turbo"
       })
     });
     
     const data = await response.json();
     
-    // Handle different response formats
-    const imageUrl = data.url || data.image_url || data.generated_image || data.images?.[0];
-    
-    if (!imageUrl) {
+    if (!data.success || !data.url) {
       res.status(400).json({ error: "Generation failed" });
       return;
     }
     
-    res.json({ imageUrl: imageUrl });
+    res.json({ imageUrl: data.url });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
