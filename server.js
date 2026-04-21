@@ -55,8 +55,7 @@ app.post("/api/generate-image", async (req, res) => {
       body: JSON.stringify({
         prompt: prompt + " abstract background for music event, vibrant colors, no text",
         n: 1,
-        size: "1024x1024",
-        quality: "standard"
+        size: "1024x1024"
       })
     });
     
