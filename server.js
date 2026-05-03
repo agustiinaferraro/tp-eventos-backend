@@ -572,14 +572,21 @@ app.post("/api/users/:uid/profiles", async (req, res) => {
 });
 
 // =====================
-// API: SALAS DE USUARIO (MongoDB)
+// API: SALAS DE USUARIO (MongoDB) - por perfil
 // =====================
 
 app.get("/api/users/:uid/salas", async (req, res) => {
   try {
     const { uid } = req.params;
+    const { profile } = req.query; // Obtener perfil de query param
     const user = await db.collection("users").findOne({ uid });
-    res.json({ salas: user?.salas || [] });
+    if (!profile) {
+      res.json({ salas: user?.salas || [] });
+    } else {
+      // Buscar salas del perfil específico
+      const profileData = user?.profiles?.find(p => p.name === profile);
+      res.json({ salas: profileData?.salas || [] });
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error al obtener salas" });
@@ -589,13 +596,30 @@ app.get("/api/users/:uid/salas", async (req, res) => {
 app.post("/api/users/:uid/salas", async (req, res) => {
   try {
     const { uid } = req.params;
-    const { salas } = req.body;
+    const { salas, profile } = req.body; // Obtener perfil del body
     
-    await db.collection("users").updateOne(
-      { uid },
-      { $set: { salas } },
-      { upsert: true }
-    );
+    if (!profile) {
+      // Mantener compatibilidad: si no hay perfil, guardar como antes
+      await db.collection("users").updateOne(
+        { uid },
+        { $set: { salas } },
+        { upsert: true }
+      );
+    } else {
+      // Actualizar salas del perfil específico
+      const user = await db.collection("users").findOne({ uid });
+      const profiles = user?.profiles || [];
+      const profileIndex = profiles.findIndex(p => p.name === profile);
+      
+      if (profileIndex >= 0) {
+        profiles[profileIndex].salas = salas;
+        await db.collection("users").updateOne(
+          { uid },
+          { $set: { profiles } },
+          { upsert: true }
+        );
+      }
+    }
     
     res.json({ success: true, salas });
   } catch (err) {
@@ -605,7 +629,7 @@ app.post("/api/users/:uid/salas", async (req, res) => {
 });
 
 // =====================
-// API: EXPERIENCIA DE SALA (MongoDB)
+// API: EXPERIENCIA DE SALA (MongoDB) - por perfil
 // =====================
 
 const DEFAULT_EXPERIENCE = {
@@ -640,7 +664,9 @@ const DEFAULT_EXPERIENCE = {
 app.get("/api/salas/:name/experience", async (req, res) => {
   try {
     const { name } = req.params;
-    const sala = await db.collection("experiences").findOne({ name: name.toLowerCase() });
+    const { profile } = req.query;
+    const key = profile ? `${name.toLowerCase()}_${profile}` : name.toLowerCase();
+    const sala = await db.collection("experiences").findOne({ name: key });
     res.json({ experience: sala?.experience || DEFAULT_EXPERIENCE });
   } catch (err) {
     console.error(err);
@@ -651,10 +677,11 @@ app.get("/api/salas/:name/experience", async (req, res) => {
 app.post("/api/salas/:name/experience", async (req, res) => {
   try {
     const { name } = req.params;
-    const { experience } = req.body;
+    const { experience, profile } = req.body;
+    const key = profile ? `${name.toLowerCase()}_${profile}` : name.toLowerCase();
     
     await db.collection("experiences").updateOne(
-      { name: name.toLowerCase() },
+      { name: key },
       { $set: { experience, updatedAt: new Date() } },
       { upsert: true }
     );
