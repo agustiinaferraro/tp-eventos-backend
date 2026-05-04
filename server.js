@@ -100,7 +100,10 @@ const initMongo = async () => {
 const rooms = {};
 
 async function saveStat(roomName, type, data = {}) {
-  if (!db) return;
+  if (!db) {
+    console.error("MongoDB not connected - cannot save stat:", type);
+    return;
+  }
   try {
     await db.collection("stats").insertOne({
       room: roomName.toLowerCase(),
@@ -108,6 +111,7 @@ async function saveStat(roomName, type, data = {}) {
       timestamp: new Date(),
       ...data
     });
+    console.log("Stat saved:", type, "for room:", roomName);
   } catch (err) {
     console.error("Error guardando stat:", err.message);
   }
