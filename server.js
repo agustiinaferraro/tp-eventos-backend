@@ -703,11 +703,12 @@ app.post("/api/salas/:name/experience", async (req, res) => {
 
 app.get("/api/stats/:sala", async (req, res) => {
   if (!db) {
-    return res.json({ stats: [], summary: { connections: 0, disconnections: 0, activeConnections: 0, totalEnergy: 0 } });
+    return res.json({ stats: [], summary: { connections:0, disconnections:0, activeConnections:0, totalEnergy:0 } });
   }
   
   try {
-    const sala = req.params.sala.toLowerCase();
+    // Normalizar: minúsculas y espacios por guiones
+    const sala = req.params.sala.toLowerCase().replace(/\s+/g, '-');
     const { limit = 100 } = req.query;
     
     const stats = await db.collection("stats")
